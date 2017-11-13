@@ -102,12 +102,12 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 		cfg.Provider == "" ||
 		s.issuer.GetSpec().ACME == nil ||
 		s.issuer.GetSpec().ACME.DNS01 == nil {
-		return nil, fmt.Errorf("no dns01 config found for domain '%s'", domain)
+		return nil, fmt.Errorf("no dns01 config found for domain %q", domain)
 	}
 
 	providerConfig, err := s.issuer.GetSpec().ACME.DNS01.Provider(cfg.Provider)
 	if err != nil {
-		return nil, fmt.Errorf("invalid provider config specified for domain '%s': %s", domain, err.Error())
+		return nil, fmt.Errorf("invalid provider config specified for domain %q: %s", domain, err)
 	}
 
 	var impl solver
@@ -115,24 +115,24 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 	case providerConfig.CloudDNS != nil:
 		saBytes, err := s.resolveSecretKeyRef(providerConfig.CloudDNS.ServiceAccount)
 		if err != nil {
-			return nil, fmt.Errorf("error getting clouddns service account: %s", err.Error())
+			return nil, fmt.Errorf("error getting clouddns service account: %s", err)
 		}
 
 		impl, err = clouddns.NewDNSProviderServiceAccountBytes(providerConfig.CloudDNS.Project, saBytes)
 		if err != nil {
-			return nil, fmt.Errorf("error instantiating google clouddns challenge solver: %s", err.Error())
+			return nil, fmt.Errorf("error instantiating google clouddns challenge solver: %s", err)
 		}
 	case providerConfig.Cloudflare != nil:
 		apiKey, err := s.resolveSecretKeyRef(providerConfig.Cloudflare.APIKey)
 		if err != nil {
-			return nil, fmt.Errorf("error getting cloudflare service account: %s", err.Error())
+			return nil, fmt.Errorf("error getting cloudflare service account: %s", err)
 		}
 
 		email := providerConfig.Cloudflare.Email
 
 		impl, err = cloudflare.NewDNSProviderCredentials(email, string(apiKey))
 		if err != nil {
-			return nil, fmt.Errorf("error instantiating cloudflare challenge solver: %s", err.Error())
+			return nil, fmt.Errorf("error instantiating cloudflare challenge solver: %s", err)
 		}
 	case providerConfig.Route53 != nil:
 		secretAccessKey, err := s.resolveSecretKeyRef(providerConfig.Route53.SecretAccessKeyRef)
@@ -159,10 +159,10 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 			providerConfig.Route53.Region,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error instantiating route53 challenge solver: %s", err.Error())
+			return nil, fmt.Errorf("error instantiating route53 challenge solver: %s", err)
 		}
 	default:
-		return nil, fmt.Errorf("no dns provider config specified for domain '%s'", domain)
+		return nil, fmt.Errorf("no dns provider config specified for domain %q", domain)
 	}
 
 	return impl, nil
