@@ -2,6 +2,7 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -136,19 +137,26 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 			return nil, fmt.Errorf("error instantiating cloudflare challenge solver: %s", err.Error())
 		}
 	case providerConfig.Route53 != nil:
-		secretAccessKeySecret, err := s.secretLister.Secrets(s.resourceNamespace).Get(providerConfig.Route53.SecretAccessKey.Name)
+		secretAccessKey, err := s.resolveSecretKeyRef(providerConfig.Route53.SecretAccessKeyRef)
 		if err != nil {
-			return nil, fmt.Errorf("error getting route53 secret access key: %s", err.Error())
+			return nil, fmt.Errorf("error getting route53 secret access key: %s", err)
 		}
 
-		secretAccessKeyBytes, ok := secretAccessKeySecret.Data[providerConfig.Route53.SecretAccessKey.Key]
-		if !ok {
-			return nil, fmt.Errorf("error getting route53 secret access key: key '%s' not found in secret", providerConfig.Route53.SecretAccessKey.Key)
+		accessKey := providerConfig.Route53.AccessKeyID
+		if accessKey == "" {
+			accessKeyFromSecret, err := s.resolveSecretKeyRef(providerConfig.Route53.AccessKeyIDRef)
+			if err == errEmptyRef {
+				return nil, fmt.Errorf("no route53 access key provided: 'accessKeyID' or 'accessKeyIDRef' must be set")
+			}
+			if err != nil {
+				return nil, fmt.Errorf("error getting route53 access key from secret: %s", err)
+			}
+			accessKey = string(accessKeyFromSecret)
 		}
 
 		impl, err = route53.NewDNSProviderAccessKey(
-			providerConfig.Route53.AccessKeyID,
-			string(secretAccessKeyBytes),
+			accessKey,
+			string(secretAccessKey),
 			providerConfig.Route53.HostedZoneID,
 			providerConfig.Route53.Region,
 		)
@@ -160,6 +168,23 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 	}
 
 	return impl, nil
+}
+
+var errEmptyRef = errors.New("secret key reference was empty")
+
+func (s *Solver) resolveSecretKeyRef(ref v1alpha1.SecretKeySelector) ([]byte, error) {
+	if ref.Name == "" {
+		return nil, errEmptyRef
+	}
+	key, err := s.secretLister.Secrets(s.resourceNamespace).Get(ref.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error getting secret %q: %s", ref.Name, err)
+	}
+	secretBytes, ok := key.Data[ref.Key]
+	if !ok {
+		return nil, fmt.Errorf("error getting secret key ref %q: not found in secret %q", ref.Name, ref.Key)
+	}
+	return secretBytes, nil
 }
 
 func NewSolver(issuer v1alpha1.GenericIssuer, client kubernetes.Interface, secretLister corev1listers.SecretLister, resourceNamespace string) *Solver {
