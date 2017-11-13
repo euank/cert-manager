@@ -113,26 +113,24 @@ func (s *Solver) solverFor(crt *v1alpha1.Certificate, domain string) (solver, er
 	var impl solver
 	switch {
 	case providerConfig.CloudDNS != nil:
-		saSecret, err := s.secretLister.Secrets(s.resourceNamespace).Get(providerConfig.CloudDNS.ServiceAccount.Name)
+		saBytes, err := s.resolveSecretKeyRef(providerConfig.CloudDNS.ServiceAccount)
 		if err != nil {
 			return nil, fmt.Errorf("error getting clouddns service account: %s", err.Error())
 		}
-		saBytes := saSecret.Data[providerConfig.CloudDNS.ServiceAccount.Key]
 
 		impl, err = clouddns.NewDNSProviderServiceAccountBytes(providerConfig.CloudDNS.Project, saBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error instantiating google clouddns challenge solver: %s", err.Error())
 		}
 	case providerConfig.Cloudflare != nil:
-		apiKeySecret, err := s.secretLister.Secrets(s.resourceNamespace).Get(providerConfig.Cloudflare.APIKey.Name)
+		apiKey, err := s.resolveSecretKeyRef(providerConfig.Cloudflare.APIKey)
 		if err != nil {
 			return nil, fmt.Errorf("error getting cloudflare service account: %s", err.Error())
 		}
 
 		email := providerConfig.Cloudflare.Email
-		apiKey := string(apiKeySecret.Data[providerConfig.Cloudflare.APIKey.Key])
 
-		impl, err = cloudflare.NewDNSProviderCredentials(email, apiKey)
+		impl, err = cloudflare.NewDNSProviderCredentials(email, string(apiKey))
 		if err != nil {
 			return nil, fmt.Errorf("error instantiating cloudflare challenge solver: %s", err.Error())
 		}
