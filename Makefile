@@ -3,7 +3,7 @@ APP_NAME=cert-manager
 REGISTRY=quay.io
 
 PACKAGE_NAME=github.com/jetstack/cert-manager
-GO_VERSION=1.8
+GO_VERSION=1.9
 
 GOOS := linux
 GOARCH := amd64
