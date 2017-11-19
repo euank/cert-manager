@@ -126,11 +126,16 @@ clouddns:
 ```yaml
 route53:
   accessKeyID: AKIAIOSFODNN7EXAMPLE
+  accessKeyIDRef:
+    name: prod-route53-credentials
+    key: access-key-id
   region: eu-west-1
   secretAccessKeySecretRef:
     name: prod-route53-credentials-secret
     key: secret-access-key
 ```
+
+*Note*: Only one of `accessKeyID` and `accessKeyIDRef` should be specified.
 
 ##### Cloudflare
 
